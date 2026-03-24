@@ -321,6 +321,5 @@ export function serverAuth(event?: H3Event): AuthInstance {
 
   if (!database)
     _authCache.set(cacheKey, auth)
-
   return auth
 }

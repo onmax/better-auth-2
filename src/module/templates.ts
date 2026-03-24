@@ -23,6 +23,32 @@ interface BuildDatabaseCodeInput {
 
 export function buildDatabaseCode(input: BuildDatabaseCodeInput): string {
   if (input.provider === 'nuxthub') {
+    if (input.hubDialect === 'postgresql') {
+      return `import { db } from '@nuxthub/db'
+import * as schema from './schema.${input.hubDialect}.mjs'
+import { drizzleAdapter } from 'better-auth/adapters/drizzle'
+import { drizzle } from 'drizzle-orm/postgres-js'
+import postgres from 'postgres'
+
+const dialect = 'pg'
+
+function resolveBetterAuthDb() {
+  const hyperdrive = process.env.POSTGRES || globalThis.__env__?.POSTGRES || globalThis.POSTGRES
+  if (!hyperdrive?.connectionString)
+    return db
+
+  const client = postgres(hyperdrive.connectionString, {
+    prepare: false,
+    onnotice: () => {},
+  })
+
+  return drizzle({ client, schema })
+}
+
+export function createDatabase() { return drizzleAdapter(resolveBetterAuthDb(), { provider: dialect, schema, usePlural: ${input.usePlural}, camelCase: ${input.camelCase} }) }
+export { db }`
+    }
+
     return `import { db } from '@nuxthub/db'
 import * as schema from './schema.${input.hubDialect}.mjs'
 import { drizzleAdapter } from 'better-auth/adapters/drizzle'
