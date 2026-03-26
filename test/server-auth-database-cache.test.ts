@@ -1,3 +1,4 @@
+import type { H3Event } from 'h3'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const betterAuthMock = vi.fn()
@@ -26,6 +27,20 @@ vi.mock('nitropack/runtime', () => ({
   useRuntimeConfig: useRuntimeConfigMock,
 }))
 
+type MockEvent = H3Event & {
+  context: Record<string | symbol, unknown>
+}
+
+function createEvent(): MockEvent {
+  return {
+    context: {},
+    node: {
+      req: { headers: { host: 'example.com' }, socket: { encrypted: true } },
+      res: { getHeader: () => undefined, setHeader: () => undefined },
+    },
+  } as unknown as MockEvent
+}
+
 describe('serverAuth database cache behavior', () => {
   beforeEach(() => {
     vi.resetModules()
@@ -49,7 +64,34 @@ describe('serverAuth database cache behavior', () => {
     }))
   })
 
-  it('creates a fresh auth instance on each call when a database adapter is active', async () => {
+  it('reuses the same auth instance within a request when a database adapter is active', async () => {
+    createDatabaseMock.mockReturnValue({ kind: 'database-adapter' })
+
+    const { serverAuth } = await import('../src/runtime/server/utils/auth')
+    const event = createEvent()
+
+    const first = serverAuth(event)
+    const second = serverAuth(event)
+
+    expect(first).toBe(second)
+    expect(createDatabaseMock).toHaveBeenCalledTimes(1)
+    expect(betterAuthMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('creates a fresh auth instance for each request when a database adapter is active', async () => {
+    createDatabaseMock.mockReturnValue({ kind: 'database-adapter' })
+
+    const { serverAuth } = await import('../src/runtime/server/utils/auth')
+
+    const first = serverAuth(createEvent())
+    const second = serverAuth(createEvent())
+
+    expect(first).not.toBe(second)
+    expect(createDatabaseMock).toHaveBeenCalledTimes(2)
+    expect(betterAuthMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('creates a fresh auth instance without request context when a database adapter is active', async () => {
     createDatabaseMock.mockReturnValue({ kind: 'database-adapter' })
 
     const { serverAuth } = await import('../src/runtime/server/utils/auth')
