@@ -1,7 +1,7 @@
 {
   "extends": "./.nuxt/tsconfig.server.json",
   "compilerOptions": {
-    "noEmit": true
+    "noEmit": true,
   },
   "include": [
     "./.nuxt/types/auth-database.d.ts",
