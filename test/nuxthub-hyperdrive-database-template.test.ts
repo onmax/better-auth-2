@@ -10,10 +10,14 @@ describe('buildDatabaseCode', () => {
       camelCase: true,
     })
 
-    expect(code).toContain('import { useNitroApp } from \'nitropack/runtime\'')
+    expect(code).toContain('import { useNitroApp } from \'#imports\'')
+    expect(code).not.toContain('from \'nitropack/runtime\'')
     expect(code).toContain('const requestDatabaseKey = Symbol.for(\'nuxt-better-auth.requestDatabase\')')
     expect(code).toContain('hook(\'afterResponse\'')
+    expect(code).toContain('hook(\'response\'')
     expect(code).toContain('client.end({ timeout: 0 })')
+    expect(code).toContain('responseEvent?.waitUntil || responseEvent?.req?.waitUntil')
+    expect(code).toContain('waitUntil.call(responseEvent?.req || responseEvent, close)')
     expect(code).toContain('prepare: false')
     expect(code).toContain('max: 1')
     expect(code).toContain('export function createDatabase(event)')
