@@ -28,7 +28,6 @@ export function buildDatabaseCode(input: BuildDatabaseCodeInput): string {
 import * as schema from './schema.${input.hubDialect}.mjs'
 import { drizzleAdapter } from 'better-auth/adapters/drizzle'
 import { drizzle } from 'drizzle-orm/postgres-js'
-import { useNitroApp } from '#imports'
 import postgres from 'postgres'
 
 const dialect = 'pg'
@@ -53,32 +52,27 @@ function createHyperdriveAdapter(client) {
 }
 
 function registerClientCleanup(event, client) {
-  const nitroApp = useNitroApp()
-  const hooks = nitroApp.hooks
-  if (!hooks?.hook)
+  const response = event?.node?.res
+  if (!response || typeof response.once !== 'function')
     return
 
-  const unregisters = []
   let closed = false
 
-  const cleanup = (responseEvent) => {
-    if (closed || responseEvent !== event)
+  const cleanup = () => {
+    if (closed)
       return
 
     closed = true
-    for (const unregister of unregisters)
-      unregister?.()
-
     const close = client.end({ timeout: 0 }).catch(() => {})
-    const waitUntil = responseEvent?.waitUntil || responseEvent?.req?.waitUntil
+    const waitUntil = event?.waitUntil || event?.req?.waitUntil || event?.node?.req?.waitUntil
     if (typeof waitUntil === 'function')
-      waitUntil.call(responseEvent?.req || responseEvent, close)
+      waitUntil.call(event?.req || event?.node?.req || event, close)
     else
       void close
   }
 
-  unregisters.push(hooks.hook('afterResponse', cleanup))
-  unregisters.push(hooks.hook('response', (_response, responseEvent) => cleanup(responseEvent)))
+  response.once('finish', cleanup)
+  response.once('close', cleanup)
 }
 
 export function createDatabase(event) {
