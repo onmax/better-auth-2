@@ -141,6 +141,21 @@ export default defineNuxtModule<BetterAuthModuleOptions>({
             nodeTsConfig.compilerOptions.paths[key] = [value]
         }
 
+        for (const [key, value] of Object.entries(nuxt.options.alias)) {
+          if (typeof value === 'string' && (
+            key === '~' || key.startsWith('~/')
+            || key === '@' || key.startsWith('@/')
+            || key === '~~' || key.startsWith('~~/')
+            || key === '@@' || key.startsWith('@@/')
+            || key === '#shared' || key.startsWith('#shared/')
+            || key.startsWith('#layers/')
+          )) {
+            nodeTsConfig.compilerOptions.paths[key] = [value]
+            if (!key.endsWith('/*'))
+              nodeTsConfig.compilerOptions.paths[`${key}/*`] = [join(value, '*')]
+          }
+        }
+
         nodeTsConfig.compilerOptions.paths['#server/*'] = [join(serverDir, '*')]
 
         for (const path of projectReferenceTypePaths) {
