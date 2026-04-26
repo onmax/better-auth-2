@@ -7,11 +7,11 @@ import type {
   BetterAuthDatabaseProviderEnabledContext,
   BetterAuthDatabaseProviderSetupContext,
 } from './types/hooks'
-import { existsSync } from 'node:fs'
+import { existsSync, readFileSync, statSync } from 'node:fs'
 import { mkdir, writeFile } from 'node:fs/promises'
 import { addTemplate, createResolver, defineNuxtModule, getLayerDirectories, hasNuxtModule } from '@nuxt/kit'
 import { consola as _consola } from 'consola'
-import { dirname, join, relative } from 'pathe'
+import { dirname, isAbsolute, join, relative } from 'pathe'
 import { version } from '../package.json'
 import { resolveDatabaseProvider } from './database-provider'
 import { getEffectiveModuleConfigFile, resolveModuleConfigPath, shouldCreateDefaultModuleConfig } from './module/config-paths'
@@ -26,6 +26,33 @@ import { registerServerTypeTemplates, registerSharedTypeTemplates } from './modu
 import './types/hooks'
 
 const consola = _consola.withTag('nuxt-better-auth')
+
+function isServerConfigSharedTypeSafe(serverConfigPath: string): boolean {
+  const resolvedPath = [
+    serverConfigPath,
+    `${serverConfigPath}.ts`,
+    `${serverConfigPath}.mts`,
+    `${serverConfigPath}.cts`,
+    `${serverConfigPath}.js`,
+    `${serverConfigPath}.mjs`,
+    `${serverConfigPath}.cjs`,
+  ].find(path => existsSync(path))
+
+  if (!resolvedPath)
+    return false
+
+  const contents = readFileSync(resolvedPath, 'utf8')
+
+  return !(
+    /from\s+['"]#server/.test(contents)
+    || /from\s+['"]#layers\//.test(contents)
+    || /from\s+['"]~~/.test(contents)
+    || /from\s+['"]@@/.test(contents)
+    || /\bdb\b/.test(contents)
+    || /\bsessionHookAfter\b/.test(contents)
+    || /@nuxthub\/db/.test(contents)
+  )
+}
 
 async function createDefaultAuthConfigFiles(nuxt: Nuxt): Promise<void> {
   const project = getLayerDirectories(nuxt)[0]!
@@ -110,7 +137,7 @@ export default defineNuxtModule<BetterAuthModuleOptions>({
     nuxt.options.alias['#auth/client'] = clientConfigPath
 
     if (!clientOnly) {
-      nuxt.hook('prepare:types', ({ nodeTsConfig, nodeReferences, sharedReferences }) => {
+      nuxt.hook('prepare:types', ({ nodeTsConfig, nodeReferences }) => {
         nodeTsConfig.compilerOptions ||= {}
         nodeTsConfig.compilerOptions.paths ||= {}
 
@@ -142,18 +169,12 @@ export default defineNuxtModule<BetterAuthModuleOptions>({
         }
 
         for (const [key, value] of Object.entries(nuxt.options.alias)) {
-          if (typeof value === 'string' && (
-            key === '~' || key.startsWith('~/')
-            || key === '@' || key.startsWith('@/')
-            || key === '~~' || key.startsWith('~~/')
-            || key === '@@' || key.startsWith('@@/')
-            || key === '#shared' || key.startsWith('#shared/')
-            || key.startsWith('#layers/')
-          )) {
-            nodeTsConfig.compilerOptions.paths[key] = [value]
-            if (!key.endsWith('/*'))
-              nodeTsConfig.compilerOptions.paths[`${key}/*`] = [join(value, '*')]
-          }
+          if (typeof value !== 'string' || !isAbsolute(value))
+            continue
+
+          nodeTsConfig.compilerOptions.paths[key] ||= [value]
+          if (!key.includes('*') && existsSync(value) && statSync(value).isDirectory())
+            nodeTsConfig.compilerOptions.paths[`${key}/*`] ||= [join(value, '*')]
         }
 
         nodeTsConfig.compilerOptions.paths['#server/*'] = [join(serverDir, '*')]
@@ -161,8 +182,6 @@ export default defineNuxtModule<BetterAuthModuleOptions>({
         for (const path of projectReferenceTypePaths) {
           if (!nodeReferences.some(reference => 'path' in reference && reference.path === path))
             nodeReferences.push({ path })
-          if (!sharedReferences.some(reference => 'path' in reference && reference.path === path))
-            sharedReferences.push({ path })
         }
       })
     }
@@ -266,6 +285,7 @@ export { schema }
         serverConfigPath,
         hasHubDb,
         runtimeTypesPath: resolver.resolve('./runtime/types'),
+        sharedServerConfigSafe: isServerConfigSharedTypeSafe(serverConfigPath),
       })
 
       if (hasHubDb) {
