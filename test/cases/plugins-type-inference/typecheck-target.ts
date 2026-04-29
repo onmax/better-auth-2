@@ -17,6 +17,7 @@ const user: AuthUser = {
   email: 'a@b.c',
   emailVerified: false,
   name: 'n',
+  banned: false,
   role: 'admin',
   internalCode: 'x',
   foo: 'bar',

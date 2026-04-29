@@ -31,11 +31,24 @@ describe('type inference regressions #107 and #192', () => {
     expect(output).not.toContain(`Property 'signInUsername' does not exist on type`)
     expect(output).not.toContain(`'signInUsername' does not exist on type`)
 
+    const appTypecheck = spawnSync('npx', ['vue-tsc', '--noEmit', '--pretty', 'false', '-p', 'tsconfig.app-type-check.json'], {
+      cwd: fixtureDir,
+      env,
+      encoding: 'utf8',
+    })
+    expect(appTypecheck.status, `app vue-tsc failed:\n${appTypecheck.stdout}\n${appTypecheck.stderr}`).toBe(0)
+    const appOutput = `${appTypecheck.stdout}\n${appTypecheck.stderr}`
+    expect(appOutput).not.toContain(`Property 'role' does not exist on type 'AuthUser'`)
+    expect(appOutput).not.toContain(`Property 'impersonatedBy' does not exist on type 'AuthSession'`)
+
     const sharedTypecheck = spawnSync('npx', ['vue-tsc', '--noEmit', '--pretty', 'false', '-p', '.nuxt/tsconfig.shared.json'], {
       cwd: fixtureDir,
       env,
       encoding: 'utf8',
     })
     expect(sharedTypecheck.status, `shared vue-tsc failed:\n${sharedTypecheck.stdout}\n${sharedTypecheck.stderr}`).toBe(0)
+    const sharedOutput = `${sharedTypecheck.stdout}\n${sharedTypecheck.stderr}`
+    expect(sharedOutput).not.toContain(`Property 'role' does not exist on type 'AuthUser'`)
+    expect(sharedOutput).not.toContain(`Property 'impersonatedBy' does not exist on type 'AuthSession'`)
   }, 60_000)
 })

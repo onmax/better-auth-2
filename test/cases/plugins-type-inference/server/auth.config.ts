@@ -1,4 +1,4 @@
-import { username } from 'better-auth/plugins'
+import { admin, username } from 'better-auth/plugins'
 import { defineServerAuth } from '../../../../src/runtime/config'
 
 function customAdminLikePlugin() {
@@ -35,7 +35,7 @@ function customAdminLikePlugin() {
 
 export default defineServerAuth(() => ({
   emailAndPassword: { enabled: true },
-  plugins: [customAdminLikePlugin(), username()] as const,
+  plugins: [customAdminLikePlugin(), username(), admin()] as const,
   socialProviders: {
     github: {
       clientId: 'test-client-id',
