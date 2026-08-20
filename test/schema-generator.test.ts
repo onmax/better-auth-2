@@ -80,7 +80,7 @@ describe('generateDrizzleSchema', () => {
 
   it('generates relations', async () => {
     const schema = await generateDrizzleSchema({}, 'postgresql')
-    expect(schema).toContain('relations')
+    expect(schema).toContain('defineRelationsPart')
   })
 })
 

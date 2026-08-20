@@ -1,7 +1,8 @@
 import type { BetterAuthOptions } from 'better-auth'
 import type { Casing } from 'drizzle-orm/utils'
+import { drizzleAdapter as drizzleRelationsV2Adapter } from '@better-auth/drizzle-adapter/relations-v2'
 import { existsSync } from 'node:fs'
-import { generateDrizzleSchema as _generateDrizzleSchema } from 'auth/api'
+import { generateSchema } from 'auth/api'
 import { consola } from 'consola'
 import { join } from 'pathe'
 
@@ -9,13 +10,6 @@ export interface SchemaOptions { usePlural?: boolean, useUuid?: boolean, casing?
 
 type Dialect = 'sqlite' | 'postgresql' | 'mysql'
 type Provider = 'sqlite' | 'pg' | 'mysql'
-type DrizzleSchemaInput = Parameters<typeof _generateDrizzleSchema>[0]
-
-// Minimal interface matching what _generateDrizzleSchema actually uses from adapter
-interface SchemaGeneratorAdapter {
-  id: 'drizzle'
-  options: { provider: Provider, camelCase: boolean, schemaName?: string, adapterConfig: { usePlural: boolean } }
-}
 
 function dialectToProvider(dialect: Dialect): Provider {
   return dialect === 'postgresql' ? 'pg' : dialect
@@ -35,19 +29,16 @@ export async function generateDrizzleSchema(authOptions: BetterAuthOptions, dial
     },
   }
 
-  const adapter: SchemaGeneratorAdapter = {
-    id: 'drizzle',
-    options: {
-      provider,
-      camelCase: schemaOptions?.casing !== 'snake_case',
-      schemaName: schemaOptions?.schemaName,
-      adapterConfig: { usePlural: schemaOptions?.usePlural ?? false },
-    },
-  }
+  const adapter = drizzleRelationsV2Adapter({}, {
+    provider,
+    camelCase: schemaOptions?.casing !== 'snake_case',
+    schemaName: schemaOptions?.schemaName,
+    usePlural: schemaOptions?.usePlural ?? false,
+  })(options)
 
-  const result = await _generateDrizzleSchema({
-    adapter: adapter as unknown as DrizzleSchemaInput['adapter'],
-    options: options as unknown as DrizzleSchemaInput['options'],
+  const result = await generateSchema({
+    adapter,
+    options,
   })
   if (!result.code) {
     throw new Error(`Schema generation returned empty result for ${dialect}`)
